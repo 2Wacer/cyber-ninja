@@ -1,0 +1,971 @@
+<html>
+<head>
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Cyber Ninja</title>
+<style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body {
+        background-color: #000;
+        overflow: hidden;
+        touch-action: none;
+        font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+        color: #fff;
+        display: flex;
+        justify-content: center;
+        align-items: center;
+        height: 100vh;
+    }
+    
+    #game-wrapper {
+        position: relative;
+        width: 100%;
+        height: 100%;
+        max-width: 420px;
+        max-height: 800px;
+        background-color: #050505;
+        overflow: hidden;
+        border-left: 1px solid #111;
+        border-right: 1px solid #111;
+    }
+
+    canvas { display: block; width: 100%; height: 100%; }
+    
+    /* --- Игровой HUD --- */
+    #ui {
+        position: absolute;
+        top: 0; left: 0; right: 0;
+        padding: 20px;
+        display: flex;
+        justify-content: space-between;
+        pointer-events: none;
+        z-index: 10;
+    }
+    .hud-item {
+        display: flex;
+        flex-direction: column;
+        align-items: flex-start;
+        font-size: 18px;
+        font-weight: 700;
+        letter-spacing: 1px;
+        text-shadow: 0 0 10px rgba(255,255,255,0.5);
+    }
+    .hud-line {
+        width: 100%;
+        height: 4px;
+        margin-top: 6px;
+        border-radius: 2px;
+    }
+    #lives { color: #ff0055; text-shadow: 0 0 10px #ff0055; }
+    #lives .hud-line { background: #ff0055; box-shadow: 0 0 10px #ff0055; }
+    #score { color: #00e5ff; text-shadow: 0 0 10px #00e5ff; }
+    #score .hud-line { background: #00e5ff; box-shadow: 0 0 10px #00e5ff; }
+
+    /* --- Экран приветствия (для разблокировки звука) --- */
+    #intro-screen {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: #050505; z-index: 100;
+        display: flex; justify-content: center; align-items: center;
+        cursor: pointer;
+    }
+    #intro-screen h2 {
+        color: #00e5ff; 
+        font-size: clamp(16px, 5vw, 24px); 
+        letter-spacing: 2px;
+        text-transform: uppercase; 
+        animation: pulse 1.5s infinite;
+    }
+    @keyframes pulse {
+        0%, 100% { opacity: 0.5; }
+        50% { opacity: 1; }
+    }
+    
+    /* --- Заставка студии --- */
+    #splash-screen {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: #050505; z-index: 50;
+        display: none; flex-direction: column;
+        justify-content: center; align-items: center;
+        opacity: 0;
+    }
+    #splash-screen.active {
+        display: flex;
+        animation: fadeInOut 3s forwards;
+    }
+    
+    #splash-screen h1 {
+        color: #ffffff;
+        font-family: 'Consolas', 'Courier New', monospace;
+        /* Адаптивный размер шрифта (от 24px до 46px) */
+        font-size: clamp(24px, 10vw, 46px); 
+        letter-spacing: 3px; 
+        font-weight: 900;
+        text-shadow: 3px 3px 0 #000; 
+        margin-bottom: 10px;
+        text-align: center;
+        -webkit-font-smoothing: none;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    
+    #splash-screen .symbols {
+        color: #ffffff; 
+        font-family: 'Consolas', 'Courier New', monospace;
+        font-size: clamp(16px, 6vw, 24px); 
+        letter-spacing: 4px; 
+        font-weight: 900;
+        text-shadow: 2px 2px 0 #000;
+        -webkit-font-smoothing: none;
+        -moz-osx-font-smoothing: grayscale;
+    }
+    
+    @keyframes fadeInOut {
+        0% { opacity: 0; }
+        15% { opacity: 1; }
+        85% { opacity: 1; }
+        100% { opacity: 0; }
+    }
+
+    #main-menu {
+        position: absolute; top: 0; left: 0; right: 0; bottom: 0;
+        background: #050505; 
+        display: none; flex-direction: column;
+        justify-content: center; align-items: center; 
+        z-index: 30;
+    }
+    
+    #main-menu h1 { 
+        color: #fff; 
+        font-size: clamp(32px, 10vw, 42px); 
+        margin-bottom: 20px; 
+        text-shadow: 0 0 20px #00e5ff; 
+        letter-spacing: 3px; 
+        font-weight: 800;
+        text-align: center;
+    }
+
+    /* Памятка */
+    .memo-container {
+        display: flex;
+        flex-direction: column;
+        gap: 15px;
+        margin-bottom: 40px;
+        background: rgba(255, 255, 255, 0.05); 
+        padding: 20px;
+        border-radius: 0px; 
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        width: 80%;
+    }
+    .memo-item {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+    }
+    .memo-text {
+        font-size: clamp(12px, 4vw, 16px);
+        color: #ccc;
+        font-weight: 600;
+        flex: 1;
+    }
+    
+    .memo-orb {
+        width: 32px;
+        height: 32px;
+        border-radius: 50%;
+        position: relative;
+        border: 2px solid;
+        flex-shrink: 0;
+    }
+    .orb-blue { background: rgba(0, 229, 255, 0.3); border-color: #00e5ff; box-shadow: 0 0 15px rgba(0, 229, 255, 0.5); }
+    .orb-red { width: 36px; height: 36px; background: rgba(255, 0, 85, 0.3); border-color: #ff0055; box-shadow: 0 0 15px rgba(255, 0, 85, 0.5); }
+    .orb-green { background: rgba(0, 255, 102, 0.3); border-color: #00ff66; box-shadow: 0 0 15px rgba(0, 255, 102, 0.5); }
+
+    .orb-green::before {
+        content: ''; position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%); width: 16px; height: 2px; background: #fff;
+    }
+    .orb-green::after {
+        content: ''; position: absolute; top: 50%; left: 50%;
+        transform: translate(-50%, -50%); width: 2px; height: 16px; background: #fff;
+    }
+
+    #start-btn {
+        background: #00e5ff; color: #000; border: none; padding: 16px 48px;
+        font-size: clamp(16px, 5vw, 20px); font-weight: 700; font-family: inherit;
+        border-radius: 12px; cursor: pointer; 
+        box-shadow: 0 0 20px rgba(0, 229, 255, 0.4);
+        transition: transform 0.1s, box-shadow 0.1s;
+        letter-spacing: 1px;
+    }
+    #start-btn:active { transform: scale(0.95); box-shadow: 0 0 10px rgba(0, 229, 255, 0.6); }
+    
+    #game-over {
+        position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%);
+        text-align: center; display: none; z-index: 20;
+        background: #111; padding: 40px 30px;
+        border: 2px solid #ff0055; border-radius: 16px;
+        box-shadow: 0 0 40px rgba(255, 0, 85, 0.3); width: 85%;
+    }
+    #game-over h1 { color: #ff0055; font-size: clamp(20px, 7vw, 28px); margin-bottom: 15px; letter-spacing: 2px; font-weight: 800; }
+    #game-over p { color: #aaa; margin-bottom: 25px; font-size: clamp(14px, 4vw, 18px); }
+    
+    #restart-btn {
+        background: transparent; color: #00e5ff; border: 2px solid #00e5ff;
+        padding: 14px 20px; font-size: clamp(14px, 4vw, 16px); font-weight: 700;
+        font-family: inherit; cursor: pointer; border-radius: 10px;
+        transition: 0.2s; width: 100%; letter-spacing: 1px;
+    }
+    #restart-btn:active { background: #00e5ff; color: #050505; }
+</style>
+</head>
+<body>
+
+<div id="game-wrapper">
+    <!-- Экран для активации звука -->
+    <div id="intro-screen">
+        <h2>НАЖМИТЕ, ЧТОБЫ НАЧАТЬ</h2>
+    </div>
+
+    <div id="splash-screen">
+        <h1>SLASH GAMES</h1>
+        <div class="symbols">{\\\\}</div>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <div id="ui" style="display: none;">
+        <div id="lives" class="hud-item">
+            ЖИЗНИ: <span id="lives-val">3</span>
+            <div class="hud-line"></div>
+        </div>
+        <div id="score" class="hud-item" style="align-items: flex-end;">
+            СЧЕТ: <span id="score-val">0</span>
+            <div class="hud-line"></div>
+        </div>
+    </div>
+
+    <div id="game-over">
+        <h1>ИГРА ОКОНЧЕНА</h1>
+        <p>Ваш счет: <span id="final-score">0</span></p>
+        <button id="restart-btn">ЗАНОВО</button>
+    </div>
+
+    <div id="main-menu">
+        <h1>Cyber Ninja</h1>
+        
+        <div class="memo-container">
+            <div class="memo-item">
+                <div class="memo-text">Синяя сфера — очки</div>
+                <div class="memo-orb orb-blue"></div>
+            </div>
+            <div class="memo-item">
+                <div class="memo-text">Красная сфера — взрыв</div>
+                <div class="memo-orb orb-red"></div>
+            </div>
+            <div class="memo-item">
+                <div class="memo-text">Зеленая сфера — жизнь</div>
+                <div class="memo-orb orb-green"></div>
+            </div>
+        </div>
+
+        <button id="start-btn">ИГРАТЬ</button>
+    </div>
+</div>
+
+<script>
+    const canvas = document.getElementById('gameCanvas');
+    const ctx = canvas.getContext('2d');
+    const scoreEl = document.getElementById('score-val');
+    const livesEl = document.getElementById('lives-val');
+    const gameOverScreen = document.getElementById('game-over');
+    const finalScoreEl = document.getElementById('final-score');
+    const mainMenu = document.getElementById('main-menu');
+    const ui = document.getElementById('ui');
+    
+    const startBtn = document.getElementById('start-btn');
+    const restartBtn = document.getElementById('restart-btn');
+    const introScreen = document.getElementById('intro-screen');
+    const splashScreen = document.getElementById('splash-screen');
+
+    let audioCtx = null;
+    let masterGain = null;
+    let musicGain = null;
+    
+    function initAudio() {
+        if (!audioCtx) {
+            audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+            masterGain = audioCtx.createGain();
+            masterGain.connect(audioCtx.destination);
+            
+            musicGain = audioCtx.createGain();
+            musicGain.gain.value = 0.4; 
+            musicGain.connect(masterGain);
+        }
+        if (audioCtx.state === 'suspended') {
+            audioCtx.resume();
+        }
+    }
+
+    function playSplashSound() {
+        if (!audioCtx) return;
+        const now = audioCtx.currentTime;
+        
+        const oscBass = audioCtx.createOscillator();
+        const gainBass = audioCtx.createGain();
+        oscBass.type = 'sine';
+        oscBass.frequency.setValueAtTime(80, now);
+        oscBass.frequency.exponentialRampToValueAtTime(40, now + 1.5);
+        gainBass.gain.setValueAtTime(0.8, now);
+        gainBass.gain.exponentialRampToValueAtTime(0.01, now + 2);
+        oscBass.connect(gainBass);
+        gainBass.connect(masterGain);
+        oscBass.start(now);
+        oscBass.stop(now + 2);
+
+        const chordFreqs = [261.63, 329.63, 392.00, 523.25];
+        chordFreqs.forEach((freq, index) => {
+            const osc = audioCtx.createOscillator();
+            const gain = audioCtx.createGain();
+            osc.type = 'sawtooth';
+            osc.frequency.value = freq;
+            osc.detune.value = (Math.random() - 0.5) * 10;
+            
+            gain.gain.setValueAtTime(0, now);
+            gain.gain.linearRampToValueAtTime(0.15, now + 0.1); 
+            gain.gain.exponentialRampToValueAtTime(0.001, now + 1.5); 
+            
+            const filter = audioCtx.createBiquadFilter();
+            filter.type = 'lowpass';
+            filter.frequency.setValueAtTime(2000, now);
+            filter.frequency.exponentialRampToValueAtTime(200, now + 1.5);
+            
+            osc.connect(filter);
+            filter.connect(gain);
+            gain.connect(masterGain);
+            
+            osc.start(now + index * 0.05);
+            osc.stop(now + 1.5);
+        });
+    }
+
+    function playSliceSound() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(800, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.1);
+    }
+
+    function playExplosionSound() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(100, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(20, audioCtx.currentTime + 0.4);
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.4);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.4);
+    }
+
+    function playHealSound() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(400, audioCtx.currentTime);
+        osc.frequency.linearRampToValueAtTime(800, audioCtx.currentTime + 0.1);
+        osc.frequency.linearRampToValueAtTime(600, audioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.3);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.3);
+    }
+
+    function playGameOverSound() {
+        if (!audioCtx) return;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        osc.type = 'square';
+        osc.frequency.setValueAtTime(300, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.6);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.6);
+        osc.connect(gain);
+        gain.connect(masterGain);
+        osc.start();
+        osc.stop(audioCtx.currentTime + 0.6);
+    }
+
+    function playEvilLaugh() {
+        if (!audioCtx) return;
+        const duration = 1.5;
+        const now = audioCtx.currentTime;
+        const osc = audioCtx.createOscillator();
+        const gain = audioCtx.createGain();
+        const filter = audioCtx.createBiquadFilter();
+        const lfo = audioCtx.createOscillator();
+        const lfoGain = audioCtx.createGain();
+
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(120, now);
+        filter.type = 'lowpass';
+        filter.frequency.setValueAtTime(800, now);
+        lfo.type = 'sine';
+        lfo.frequency.setValueAtTime(12, now);
+        lfoGain.gain.setValueAtTime(30, now);
+        
+        lfo.connect(lfoGain);
+        lfoGain.connect(osc.frequency); 
+
+        gain.gain.setValueAtTime(0, now);
+        gain.gain.linearRampToValueAtTime(0.5, now + 0.1);
+        gain.gain.linearRampToValueAtTime(0.1, now + 0.3);
+        gain.gain.linearRampToValueAtTime(0.4, now + 0.4);
+        gain.gain.linearRampToValueAtTime(0.1, now + 0.6);
+        gain.gain.linearRampToValueAtTime(0.3, now + 0.7);
+        gain.gain.linearRampToValueAtTime(0.1, now + 0.9);
+        gain.gain.linearRampToValueAtTime(0.2, now + 1.0);
+        gain.gain.exponentialRampToValueAtTime(0.01, now + duration);
+
+        osc.connect(filter);
+        filter.connect(gain);
+        gain.connect(masterGain);
+        lfo.start(now);
+        osc.start(now);
+        osc.stop(now + duration);
+        lfo.stop(now + duration);
+    }
+
+    let musicInterval = null;
+    let isMusicPlaying = false;
+
+    function startMusic(type) {
+        if (!audioCtx || isMusicPlaying) return;
+        isMusicPlaying = true;
+
+        const bpm = type === 'menu' ? 80 : 115;
+        const stepTime = 60 / bpm / 4;
+        let step = 0;
+
+        musicInterval = setInterval(() => {
+            if (!isMusicPlaying) return;
+            const currentTime = audioCtx.currentTime;
+            
+            if (type === 'menu') {
+                const menuChords = [
+                    [261.63, 329.63, 392.00], 
+                    [220.00, 261.63, 329.63], 
+                    [174.61, 220.00, 261.63], 
+                    [196.00, 246.94, 293.66]  
+                ];
+                const bar = Math.floor(step / 16) % 4;
+                const chord = menuChords[bar];
+                
+                if (step % 16 === 0) {
+                    const oscBass = audioCtx.createOscillator();
+                    const gainBass = audioCtx.createGain();
+                    oscBass.type = 'triangle';
+                    oscBass.frequency.value = chord[0] / 2;
+                    gainBass.gain.setValueAtTime(0.2, currentTime);
+                    gainBass.gain.exponentialRampToValueAtTime(0.001, currentTime + 1.5);
+                    oscBass.connect(gainBass);
+                    gainBass.connect(musicGain);
+                    oscBass.start();
+                    oscBass.stop(currentTime + 1.5);
+                }
+
+                if (step % 4 === 0) {
+                    const note = chord[Math.floor(step / 4) % 3] * 2;
+                    const oscArp = audioCtx.createOscillator();
+                    const gainArp = audioCtx.createGain();
+                    oscArp.type = 'sine';
+                    oscArp.frequency.value = note;
+                    gainArp.gain.setValueAtTime(0.1, currentTime);
+                    gainArp.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.5);
+                    oscArp.connect(gainArp);
+                    gainArp.connect(musicGain);
+                    oscArp.start();
+                    oscArp.stop(currentTime + 0.5);
+                }
+            } else {
+                const bassNotes = [55.00, 55.00, 65.41, 65.41, 73.42, 73.42, 82.41, 82.41];
+                const arpNotes = [
+                    220.00, 261.63, 329.63, 261.63,
+                    261.63, 329.63, 392.00, 329.63,
+                    293.66, 349.23, 440.00, 349.23,
+                    329.63, 392.00, 493.88, 392.00
+                ];
+                const step16 = step % 16;
+                const bar = Math.floor(step / 16) % 4;
+
+                if (step16 % 4 === 0) {
+                    const bassFreq = bassNotes[bar];
+                    const oscBass = audioCtx.createOscillator();
+                    const gainBass = audioCtx.createGain();
+                    oscBass.type = 'sawtooth';
+                    oscBass.frequency.value = bassFreq;
+                    gainBass.gain.setValueAtTime(0.08, currentTime);
+                    gainBass.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.2);
+                    oscBass.connect(gainBass);
+                    gainBass.connect(musicGain);
+                    oscBass.start();
+                    oscBass.stop(currentTime + 0.2);
+                }
+
+                const arpFreq = arpNotes[(bar * 4) + (step16 % 4)];
+                const oscArp = audioCtx.createOscillator();
+                const gainArp = audioCtx.createGain();
+                oscArp.type = 'square';
+                oscArp.frequency.value = arpFreq;
+                gainArp.gain.setValueAtTime(0.03, currentTime);
+                gainArp.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.1);
+                oscArp.connect(gainArp);
+                gainArp.connect(musicGain);
+                oscArp.start();
+                oscArp.stop(currentTime + 0.1);
+
+                if (step16 % 4 === 0) {
+                    const oscKick = audioCtx.createOscillator();
+                    const gainKick = audioCtx.createGain();
+                    oscKick.type = 'sine';
+                    oscKick.frequency.setValueAtTime(150, currentTime);
+                    oscKick.frequency.exponentialRampToValueAtTime(40, currentTime + 0.1);
+                    gainKick.gain.setValueAtTime(0.4, currentTime);
+                    gainKick.gain.exponentialRampToValueAtTime(0.01, currentTime + 0.15);
+                    oscKick.connect(gainKick);
+                    gainKick.connect(musicGain);
+                    oscKick.start();
+                    oscKick.stop(currentTime + 0.15);
+                }
+
+                if (step16 % 2 === 1) {
+                    const oscHat = audioCtx.createOscillator();
+                    const gainHat = audioCtx.createGain();
+                    oscHat.type = 'square';
+                    oscHat.frequency.value = 6000 + Math.random() * 2000;
+                    gainHat.gain.setValueAtTime(0.015, currentTime);
+                    gainHat.gain.exponentialRampToValueAtTime(0.001, currentTime + 0.04);
+                    oscHat.connect(gainHat);
+                    gainHat.connect(musicGain);
+                    oscHat.start();
+                    oscHat.stop(currentTime + 0.04);
+                }
+            }
+            step++;
+        }, stepTime * 1000);
+    }
+
+    function stopMusic() {
+        isMusicPlaying = false;
+        if (musicInterval) {
+            clearInterval(musicInterval);
+            musicInterval = null;
+        }
+    }
+
+    let width, height;
+    function resize() {
+        const rect = canvas.parentElement.getBoundingClientRect();
+        width = canvas.width = rect.width;
+        height = canvas.height = rect.height;
+    }
+    window.addEventListener('resize', resize);
+    resize();
+
+    let score = 0, lives = 3, isGameOver = false, isPlaying = false;
+    let objects = [];
+    let slashes = [];
+    let particles = [];
+    let halves = []; 
+    let explosions = []; 
+    let shakeTime = 0; 
+    let flashAlpha = 0; 
+    let lastTime = 0, spawnTimer = 0, spawnInterval = 800;
+
+    let bgParticles = [];
+    for(let i=0; i<50; i++) {
+        bgParticles.push({
+            x: Math.random() * width,
+            y: Math.random() * height,
+            size: Math.random() * 2,
+            speedY: 0.2 + Math.random() * 0.5,
+            alpha: Math.random() * 0.5 + 0.1
+        });
+    }
+
+    class GameObject {
+        constructor() {
+            let r = Math.random();
+            if (r < 0.04) {
+                this.color = '#00ff66';
+                this.radius = 20 + Math.random() * 10;
+            } else if (r < 0.24) {
+                this.color = '#ff0055';
+                this.radius = 30 + Math.random() * 15; 
+            } else {
+                this.color = '#00e5ff';
+                this.radius = 20 + Math.random() * 15;
+            }
+            this.x = Math.random() * (width - this.radius * 2) + this.radius;
+            this.y = height + this.radius;
+            this.vx = (Math.random() - 0.5) * 0.4;
+            this.vy = -(6 + Math.random() * 3);
+            this.sliced = false;
+        }
+        update(dt) {
+            this.x += this.vx * dt * 0.06;
+            this.y += this.vy * dt * 0.06;
+            this.vy += 0.05 * dt * 0.06;
+        }
+        draw() {
+            ctx.beginPath();
+            ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.shadowBlur = 15;
+            ctx.shadowColor = this.color;
+            ctx.strokeStyle = this.color;
+            ctx.lineWidth = 3;
+            ctx.stroke();
+            ctx.fillStyle = this.color + '33';
+            ctx.fill();
+            if (this.color === '#00ff66') {
+                ctx.beginPath();
+                ctx.moveTo(this.x, this.y - this.radius*0.4);
+                ctx.lineTo(this.x, this.y + this.radius*0.4);
+                ctx.moveTo(this.x - this.radius*0.4, this.y);
+                ctx.lineTo(this.x + this.radius*0.4, this.y);
+                ctx.strokeStyle = '#fff';
+                ctx.lineWidth = 3;
+                ctx.stroke();
+            }
+            ctx.shadowBlur = 0;
+        }
+    }
+
+    class HalfObject {
+        constructor(x, y, radius, color, vx, vy, angle) {
+            this.x = x; this.y = y; this.radius = radius; this.color = color;
+            this.vx = vx; this.vy = vy; this.angle = angle;
+            this.rotation = (Math.random() - 0.5) * 0.2; this.life = 1.0;
+        }
+        update(dt) {
+            this.x += this.vx * dt * 0.06; this.y += this.vy * dt * 0.06;
+            this.vy += 0.3 * dt * 0.06; this.angle += this.rotation * dt * 0.06;
+            this.life -= dt * 0.001;
+        }
+        draw() {
+            if (this.life <= 0) return;
+            ctx.save(); ctx.translate(this.x, this.y); ctx.rotate(this.angle);
+            ctx.beginPath(); ctx.arc(0, 0, this.radius, 0, Math.PI); ctx.closePath();
+            ctx.shadowBlur = 15; ctx.shadowColor = this.color;
+            ctx.fillStyle = this.color + '66'; ctx.strokeStyle = this.color;
+            ctx.lineWidth = 3; ctx.stroke(); ctx.fill();
+            ctx.beginPath(); ctx.moveTo(-this.radius, 0); ctx.lineTo(this.radius, 0);
+            ctx.strokeStyle = '#fff'; ctx.lineWidth = 2; ctx.stroke();
+            ctx.restore(); ctx.shadowBlur = 0;
+        }
+    }
+
+    class Slash {
+        constructor(x1, y1, x2, y2) {
+            this.x1 = x1; this.y1 = y1; this.x2 = x2; this.y2 = y2; this.life = 1.0;
+        }
+        update(dt) { this.life -= dt * 0.003; }
+        draw() {
+            if (this.life <= 0) return;
+            ctx.beginPath(); ctx.moveTo(this.x1, this.y1); ctx.lineTo(this.x2, this.y2);
+            ctx.strokeStyle = `rgba(255, 255, 255, ${this.life})`;
+            ctx.lineWidth = 4; ctx.lineCap = 'round';
+            ctx.shadowBlur = 10; ctx.shadowColor = '#fff';
+            ctx.stroke(); ctx.shadowBlur = 0;
+        }
+    }
+
+    class Particle {
+        constructor(x, y, color, dirX, dirY, speedMult = 1, sizeMult = 1) {
+            this.x = x; this.y = y;
+            this.vx = ((Math.random() - 0.5) * 15 + dirX * 5) * speedMult;
+            this.vy = ((Math.random() - 0.5) * 15 + dirY * 5) * speedMult;
+            this.life = 1.0; this.color = color;
+            this.size = (2 + Math.random() * 3) * sizeMult;
+        }
+        update(dt) {
+            this.x += this.vx * dt * 0.06; this.y += this.vy * dt * 0.06;
+            this.vy += 0.2 * dt * 0.06; this.life -= dt * 0.002;
+        }
+        draw() {
+            if (this.life <= 0) return;
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+            ctx.fillStyle = this.color; ctx.globalAlpha = this.life;
+            ctx.fill(); ctx.globalAlpha = 1.0;
+        }
+    }
+
+    class ExplosionWave {
+        constructor(x, y) {
+            this.x = x; this.y = y; this.radius = 10;
+            this.life = 1.0;
+        }
+        update(dt) { this.radius += dt * 0.3; this.life -= dt * 0.003; }
+        draw() {
+            if (this.life <= 0) return;
+            ctx.beginPath(); ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+            ctx.strokeStyle = `rgba(255, 0, 85, ${this.life})`;
+            ctx.lineWidth = 5 * this.life;
+            ctx.shadowBlur = 20; ctx.shadowColor = '#ff0055';
+            ctx.stroke(); ctx.shadowBlur = 0;
+        }
+    }
+
+    function createSliceEffect(x, y, color, angle, radius) {
+        let vx1 = Math.cos(angle + Math.PI/2) * 3;
+        let vy1 = Math.sin(angle + Math.PI/2) * 3 - 2;
+        let vx2 = Math.cos(angle - Math.PI/2) * 3;
+        let vy2 = Math.sin(angle - Math.PI/2) * 3 - 2;
+
+        halves.push(new HalfObject(x, y, radius, color, vx1, vy1, angle));
+        halves.push(new HalfObject(x, y, radius, color, vx2, vy2, angle + Math.PI));
+
+        for (let i = 0; i < 15; i++) {
+            let pAngle = angle + (Math.random() - 0.5) * 2;
+            particles.push(new Particle(x, y, color, Math.cos(pAngle), Math.sin(pAngle)));
+        }
+    }
+
+    function createExplosionEffect(x, y) {
+        explosions.push(new ExplosionWave(x, y));
+        flashAlpha = 0.4; 
+        shakeTime = 10; 
+        for (let i = 0; i < 30; i++) {
+            let pAngle = Math.random() * Math.PI * 2;
+            let speed = 1.5 + Math.random();
+            let color = Math.random() > 0.5 ? '#ff0055' : '#ffaa00';
+            particles.push(new Particle(x, y, color, Math.cos(pAngle), Math.sin(pAngle), speed, 1.5));
+        }
+    }
+
+    function createHealEffect(x, y) {
+        for (let i = 0; i < 20; i++) {
+            let pAngle = Math.random() * Math.PI * 2;
+            particles.push(new Particle(x, y, '#00ff66', Math.cos(pAngle), Math.sin(pAngle), 1, 1));
+        }
+    }
+
+    function spawnObject() { objects.push(new GameObject()); }
+
+    let isTouching = false;
+    let lastX = 0, lastY = 0;
+
+    function handleStart(e) {
+        if (!isPlaying || isGameOver) return;
+        isTouching = true;
+        const rect = canvas.getBoundingClientRect();
+        lastX = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        lastY = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+    }
+
+    function handleMove(e) {
+        if (!isTouching || !isPlaying || isGameOver) return;
+        e.preventDefault();
+        
+        const rect = canvas.getBoundingClientRect();
+        const x = (e.touches ? e.touches[0].clientX : e.clientX) - rect.left;
+        const y = (e.touches ? e.touches[0].clientY : e.clientY) - rect.top;
+
+        slashes.push(new Slash(lastX, lastY, x, y));
+        let moveAngle = Math.atan2(y - lastY, x - lastX);
+
+        for (let i = objects.length - 1; i >= 0; i--) {
+            let obj = objects[i];
+            if (obj.sliced) continue;
+            const dist = Math.hypot(obj.x - x, obj.y - y);
+            if (dist < obj.radius + 15) { 
+                obj.sliced = true;
+                if (obj.color === '#ff0055') {
+                    createExplosionEffect(obj.x, obj.y);
+                    playExplosionSound(); 
+                    lives--; livesEl.innerText = lives;
+                    if (lives <= 0) endGame();
+                } else if (obj.color === '#00ff66') {
+                    createHealEffect(obj.x, obj.y);
+                    playHealSound(); 
+                    if (lives < 3) {
+                        lives++;
+                        livesEl.innerText = lives;
+                    }
+                } else {
+                    createSliceEffect(obj.x, obj.y, obj.color, moveAngle, obj.radius);
+                    playSliceSound(); 
+                    score++; scoreEl.innerText = score;
+                }
+                objects.splice(i, 1); 
+            }
+        }
+        lastX = x; lastY = y;
+    }
+
+    function handleEnd() { isTouching = false; }
+
+    canvas.addEventListener('mousedown', handleStart);
+    canvas.addEventListener('mousemove', handleMove);
+    canvas.addEventListener('mouseup', handleEnd);
+    canvas.addEventListener('mouseleave', handleEnd);
+    canvas.addEventListener('touchstart', handleStart, {passive: false});
+    canvas.addEventListener('touchmove', handleMove, {passive: false});
+    canvas.addEventListener('touchend', handleEnd);
+    canvas.addEventListener('touchcancel', handleEnd);
+
+    function drawBackground() {
+        let gradient = ctx.createLinearGradient(0, 0, 0, height);
+        gradient.addColorStop(0, '#0a0514');
+        gradient.addColorStop(0.5, '#050505');
+        gradient.addColorStop(1, '#00101a');
+        
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+
+        ctx.fillStyle = '#00e5ff';
+        bgParticles.forEach(p => {
+            p.y -= p.speedY;
+            if (p.y < 0) {
+                p.y = height;
+                p.x = Math.random() * width;
+            }
+            ctx.globalAlpha = p.alpha;
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.size, 0, Math.PI * 2);
+            ctx.fill();
+        });
+        ctx.globalAlpha = 1.0;
+    }
+
+    function gameLoop(timestamp) {
+        if (!lastTime) lastTime = timestamp;
+        const dt = timestamp - lastTime;
+        lastTime = timestamp;
+
+        if (isPlaying && !isGameOver) {
+            spawnTimer += dt;
+            if (spawnTimer > spawnInterval) {
+                spawnObject(); spawnTimer = 0;
+                spawnInterval = Math.max(250, 800 - score * 10); 
+            }
+        }
+
+        for (let i = objects.length - 1; i >= 0; i--) {
+            let obj = objects[i];
+            obj.update(dt);
+            if (obj.y < -100 || obj.y > height + 100) {
+                if (isPlaying && !isGameOver && obj.y > height + 100 && !obj.sliced && obj.color === '#00e5ff') {
+                    lives--; livesEl.innerText = lives;
+                    if (lives <= 0) endGame();
+                }
+                objects.splice(i, 1);
+            }
+        }
+
+        for (let i = slashes.length - 1; i >= 0; i--) {
+            slashes[i].update(dt); if (slashes[i].life <= 0) slashes.splice(i, 1);
+        }
+        for (let i = particles.length - 1; i >= 0; i--) {
+            particles[i].update(dt); if (particles[i].life <= 0) particles.splice(i, 1);
+        }
+        for (let i = halves.length - 1; i >= 0; i--) {
+            halves[i].update(dt); if (halves[i].life <= 0) halves.splice(i, 1);
+        }
+        for (let i = explosions.length - 1; i >= 0; i--) {
+            explosions[i].update(dt); if (explosions[i].life <= 0) explosions.splice(i, 1);
+        }
+        
+        if (flashAlpha > 0) { flashAlpha -= dt * 0.002; if (flashAlpha < 0) flashAlpha = 0; }
+        if (shakeTime > 0) { shakeTime -= dt * 0.05; if (shakeTime < 0) shakeTime = 0; }
+
+        ctx.clearRect(0, 0, width, height);
+        drawBackground(); 
+        
+        ctx.save();
+        if (shakeTime > 0) {
+            let sx = (Math.random() - 0.5) * shakeTime;
+            let sy = (Math.random() - 0.5) * shakeTime;
+            ctx.translate(sx, sy);
+        }
+
+        objects.forEach(obj => obj.draw());
+        halves.forEach(h => h.draw());
+        slashes.forEach(s => s.draw());
+        explosions.forEach(e => e.draw());
+        particles.forEach(p => p.draw());
+
+        ctx.restore();
+
+        if (flashAlpha > 0) {
+            ctx.fillStyle = `rgba(255, 0, 85, ${flashAlpha})`;
+            ctx.fillRect(0, 0, width, height);
+        }
+
+        requestAnimationFrame(gameLoop);
+    }
+
+    function endGame() {
+        isGameOver = true; isPlaying = false;
+        finalScoreEl.innerText = score;
+        gameOverScreen.style.display = 'block';
+        playEvilLaugh();
+        playGameOverSound(); 
+        stopMusic(); 
+    }
+
+    function startGame() {
+        initAudio(); 
+        stopMusic(); 
+        startMusic('game'); 
+        
+        mainMenu.style.display = 'none';
+        gameOverScreen.style.display = 'none';
+        ui.style.display = 'flex';
+        
+        score = 0; lives = 3; isGameOver = false; isPlaying = true;
+        objects = []; slashes = []; particles = []; halves = []; explosions = [];
+        shakeTime = 0; flashAlpha = 0;
+        spawnTimer = 0; spawnInterval = 800;
+        scoreEl.innerText = 0;
+        livesEl.innerText = 3;
+    }
+
+    startBtn.addEventListener('click', startGame);
+    restartBtn.addEventListener('click', startGame);
+
+    introScreen.addEventListener('click', () => {
+        initAudio();
+        playSplashSound();
+        
+        introScreen.style.display = 'none';
+        splashScreen.classList.add('active');
+        
+        setTimeout(() => {
+            splashScreen.classList.remove('active');
+            splashScreen.style.display = 'none';
+            mainMenu.style.display = 'flex';
+            startMusic('menu');
+        }, 3000);
+    }, { once: true });
+
+    requestAnimationFrame(gameLoop);
+
+    document.body.addEventListener('touchmove', function(e) {
+        if(e.target === canvas) e.preventDefault();
+    }, { passive: false });
+</script>
+</body>
+</html>
